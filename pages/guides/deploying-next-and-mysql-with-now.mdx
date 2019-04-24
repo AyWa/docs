@@ -13,17 +13,19 @@ export const meta = {
   description:
     'How to deploy your Next.js and MySQL application with Now in a serverless environment',
   published: '2019-04-15T03:00:00.860Z',
-  authors: ['msweeneydev, furf'],
+  authors: ['msweeneydev', 'furf'],
   url: '/guides/deploying-next-and-mysql-with-now',
   image:
     'https://og-image.now.sh/**Deploy%20a%20Charge%20site**%20with%20Now.png?theme=light&md=1&fontSize=75px&images=https%3A%2F%2Fassets.zeit.co%2Fimage%2Fupload%2Ffront%2Fassets%2Fdesign%2Fnow-black.svg&images=https%3A%2F%2Fd33wubrfki0l68.cloudfront.net%2F25151dcf9878a3c40b686628cc84c9292d95ca0e%2F9e22f%2Fimages%2Flogomark.svg',
   editUrl: 'pages/guides/deploying-next-and-mysql-with-now.mdx',
-  lastEdited: '2019-04-16T10:43:38.000Z'
+  lastEdited: '2019-04-24T20:33:25.000Z'
 }
 
 [Next.js](https://nextjs.org/) is a framework, created by [ZEIT](https://zeit.co), for creating production-ready, fast, and extended React applications with a lot of handy features built-in.
 
 In this guide, we will walk you through creating and [deploying](/docs/v2/deployments/basics/) a [Next.js](https://nextjs.org/) app with the most popular open source database in the world, [MySQL](https://www.mysql.com/), on [ZEIT Now](/docs/v2).
+
+The app is used to display robot profiles in two views, gallery and individual, it also features the use of pagination, the finished app can be found at <https://serverless-mysql.now.sh/>
 
 <Image
   src={`${
@@ -34,7 +36,7 @@ In this guide, we will walk you through creating and [deploying](/docs/v2/deploy
   oversize
 />
 
-## Step 1: Populating Your Database
+## Step 1: Populating Your MySQL Database
 
 To use this guide you will need to have a remote MySQL database setup. There are many cloud providers who will be able to offer this service as a trial to you free of charge such as [Amazon Web Services](https://aws.amazon.com/rds/sqlserver/), [Google Cloud](https://cloud.google.com/sql/) and [Microsoft Azure](https://azure.microsoft.com/en-gb/services/sql-database/).
 
@@ -43,20 +45,22 @@ To use this guide you will need to have a remote MySQL database setup. There are
   incurring unwanted charges.
 </Note>
 
-Once you have your remote MySQL database setup, you should make a note of four key pieces of information:
+Once you have your remote MySQL database setup, you should make a note of your database credentials:
 
 - Database name
 - Database hostname
 - Database username
 - Database password
 
-## Step 1: Set Up Your Next.js Project
+Using these credentials, you should connect to your database and insert the [example data](/link-to-db.sql=file) into a new table. This guide does not cover inserting records into a MySQL database, more information on doing this can be found in the [MySQL documentation](https://dev.mysql.com/doc/mysql-getting-started/en/).
 
-[Charge](https://charge.js.org/) focuses on simplicity and provides no boilerplate as a result. To get started with Charge create your project directory, let's call it `charge-app`, and `cd` into it:
+## Step 2: Set Up Your Project
 
-<TerminalInput>mkdir charge-app && cd charge-app</TerminalInput>
+Now that you have populated the database, you should a project directory and `cd` into it:
+
+<TerminalInput>mkdir serverless-mysql && cd serverless-mysql</TerminalInput>
 <Caption>
-  Creating and entering into the <InlineCode>/charge-app</InlineCode>{' '}directory.
+  Creating and entering into the <InlineCode>/serverless-mysql</InlineCode>{' '}directory.
 </Caption>
 
 Next, [initialize](https://yarnpkg.com/lang/en/docs/cli/init/) the project:
@@ -66,230 +70,383 @@ Next, [initialize](https://yarnpkg.com/lang/en/docs/cli/init/) the project:
   Initialising the project, this creates a <InlineCode>package.json</InlineCode>{' '}file.
 </Caption>
 
-Yarn will present some initial questions to set up your project, complete this and when done, add Charge as a [development dependency](https://yarnpkg.com/en/docs/cli/add#toc-yarn-add-dev-d):
+Yarn will present some initial questions to set up your project, complete this and when done, add [`serverless-mysql`](https://github.com/jeremydaly/serverless-mysql) as a [dependency](https://yarnpkg.com/en/docs/cli/add#toc-yarn-add):
 
-<TerminalInput>yarn add -D @static/charge</TerminalInput>
+<TerminalInput>yarn add serverless-mysql</TerminalInput>
 <Caption>
-  Adding Charge as a development dependency to our project.
+  Adding <InlineCode>serverless-mysql</InlineCode> as a dependency to the project.
 </Caption>
 
-Now, make an addition to `package.json`, as recommended by the [Charge documentation](https://charge.js.org/usage), by adding the following `scripts` object:
+Adding [`serverless-mysql`](https://github.com/jeremydaly/serverless-mysql) to the project will allow you to make connections to your MySQL database. In addition to this, it also helps you **manage connections**, ensuring you do not 'max out' the available connections.
 
-```json
-{
-  "scripts": {
-    "start": "charge serve src",
-    "build": "charge build src dist"
+Managing MySQL connections is an essential part of using it **successfully in a serverless environment**, this is because [serverless functions](/docs/v2/deployments/concepts/lambdas/) scale by creating separate instances for each concurrent user and can quickly use up all available connections if not managed.
+
+Now, add your database credentials from [step 1](#step-1:-populating-your-database) to the project as [secrets](/v2/deployments/environment-variables-and-secrets#securing-environment-variables-using-secrets) using the Now CLI to keep them secure:
+
+<TerminalInput>
+  now secrets add MYSQL_HOST $database-hostname && now secrets add MYSQL_USER
+  $database-username && now secrets add MYSQL_DATABASE $database-name && now
+  secrets add MYSQL_PASSWORD $database-password
+</TerminalInput>
+<Caption>
+  Adding <GenericLink href="/v2/deployments/environment-variables-and-secrets#securing-environment-variables-using-secrets">secrets</GenericLink> to the project.
+</Caption>
+
+## Step 3: Create Your Reusable Database Connection
+
+To ensure all your MySQL connections are managed by [`serverless-mysql`](https://github.com/jeremydaly/serverless-mysql) you should create a helper function to form the connection each time.
+
+Create a `/lib` directory with a `db.js` file inside:
+
+<TerminalInput>mkdir lib</TerminalInput>
+<Caption>
+  Creating a <InlineCode>/lib</InlineCode>{' '}directory.
+</Caption>
+
+Add the following code to `db.js`:
+
+```js
+const mysql = require('serverless-mysql')
+
+const db = mysql({
+  config: {
+    host: process.env.MYSQL_HOST,
+    database: process.env.MYSQL_DATABASE,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD
+  }
+})
+
+exports.query = async query => {
+  try {
+    const results = await db.query(query)
+    await db.end()
+    return results
+  } catch (error) {
+    return { error }
   }
 }
 ```
 
 <Caption>
-  Adding development and build scripts to the{' '}
-  <InlineCode>package.json</InlineCode> file.
+  An example <InlineCode>db.js</InlineCode> file for your project.
 </Caption>
 
-These scripts enable you to run a local development server with `yarn start` and, as you will see later on, [build](/docs/v2/deployments/builds/) your Charge site before [deploying](/docs/v2/deployments/basics/) with `now`.
+Your `db.js` file performs the following functions:
 
-## Step 2: Add Content To Your Charge Project
+- Creates a connection to your MySQL database using credentials defined as secrets
+- Exports a wrapper that ensures connections are closed the query is resolved
 
-The following example content setup demonstrates a few of Charge's key features, notably the use of `.jsx`, `.mdx`, and using a layout component.
+Now you have a reusable database connection, perfectly suited for serverless.
 
-Firstly, create two directories, `/src` and `/src/pages` within your project directory:
+## Step 4: Creating Your Node.js API
 
-<TerminalInput>mkdir src && mkdir src/pages</TerminalInput>
+The next step is to create your API, start off by creating a `/api` directory with a `/profiles` directory inside:
+
+<TerminalInput>
+  mkdir api && mkdir api/profiles
+</TerminalInput>
 <Caption>
-  Creating a <InlineCode>/src</InlineCode>{' '}directory with a <InlineCode>/pages</InlineCode>{' '} directory inside of it.
+  Creating an <InlineCode>/api</InlineCode> directory with a <InlineCode>/profiles</InlineCode> directory inside it.
 </Caption>
 
-By keeping your components inside of the `/src` directory and our content inside of the `/pages` directory, this will help keep your project organized.
+Inside your `/profiles` directory create an `index.js` file with the following code:
 
-Next, create an `index.html.jsx` file inside the `/src` directory that will serve as the entrypoint to your Charge-powered website.
+```js
+const db = require('../../lib/db')
+const url = require('url')
 
-<Note>
-  During the build process, Charge will remove <InlineCode>jsx</InlineCode> and
-  <InlineCode>mdx</InlineCode>
-  extensions, leaving you with just static <InlineCode>html</InlineCode>files.
-</Note>
-
-Now, you will need to add some some content to your index file. Use the example below, or add your own:
-
-```jsx
-export default () => {
-  return <h1>Welcome to my new Charge site!</h1>
+module.exports = async (req, res) => {
+  const { query } = url.parse(req.url, true)
+  let page = parseInt(query.page) || 1
+  const limit = parseInt(query.limit) || 9
+  if (page < 1) page = 1
+  const profiles = await db.query(`
+      SELECT *
+      FROM profiles
+      LIMIT ${(page - 1) * limit}, ${limit}
+    `)
+  const count = await db.query(`
+      SELECT COUNT(*)
+      AS profilesCount
+      FROM profiles
+    `)
+  const { profilesCount } = count[0]
+  const pageCount = Math.ceil(profilesCount / limit)
+  res.end(JSON.stringify({ profiles, pageCount, page }))
 }
 ```
 
 <Caption>
-  An example <InlineCode>index.html.jsx</InlineCode> file in a Charge project.
+  An example <InlineCode>index.js</InlineCode> file for your project.
 </Caption>
 
-Like many static site generators, Charge encourages the use of a layout component. This component will be used to define the layout of your `.mdx` pages later on.
+Your `index.js` file performs the following functions:
 
-<Note>
-  Charge automatically imports React into <InlineCode>jsx</InlineCode> files so
-  you don't have to.
-</Note>
+- Parses the request query parameters
+- Uses the query parameters to determine the number of profiles required
+- Requests only the required profiles from the database
+- Queries the database to get the total records
+- Uses the records count to calculate paginations
+- Sends the retrieved profiles and pagination details as a response
 
-Create a simple `layout.html.jsx` file inside of the `/src` directory with the following content:
+That is all the API code required to successfully use pagination in a serverless environment. As a result, your pages will load incredibly fast.
 
-```jsx
-export default ({ children }) => {
-  return children
+Next, create a `profile.js` file in your `/profiles` directory containing the code below:
+
+```js
+const db = require('../../lib/db')
+const url = require('url')
+
+module.exports = async (req, res) => {
+  const { query } = url.parse(req.url, true)
+  const [profile] = await db.query(`
+    SELECT *
+    FROM profiles
+    WHERE id = ${query.id}
+  `)
+  res.end(JSON.stringify({ profile }))
 }
 ```
 
 <Caption>
-  An example <InlineCode>layout.html.jsx</InlineCode> file in a Charge project.
+  An example <InlineCode>profile.js</InlineCode> file for your project.
 </Caption>
 
-If, at any point, you want to see how your changes look, you can serve them locally with the script we added in the first step:
+Your `profile.js` file performs the following functions:
 
-<TerminalInput>yarn start</TerminalInput>
+- Parses the request query parameter
+- Uses the query parameter to select a single profile from the database
+- Sends the retrieved profile as a response
+
+You now have an API that will give you either all profiles or just a single one, you now need to create the application interface to display them.
+
+## Step 5: Creating Your Next.js Client
+
+To add [Next.js]() to your project, you should install the following dependencies:
+
+<TerminalInput>
+  yarn add isomorphic-unfetch next react react-dom
+</TerminalInput>
 <Caption>
-  Starting up a local development server using a script.
+  Adding multiple dependencies to the project.
 </Caption>
 
-Charge will open a new tab for you, if not you can navigate to `localhost:2468` to see the changes you make, live-reloading is enabled through [Browsersync](https://browsersync.io/).
+Next, create a `/pages` directory like so:
 
-Now that you have a layout component, use it to wrap a `.mdx` file. Create a file named `about.html.mdx` inside of your `/pages` directory.
-
-Add some content to your about page and export it inside of the layout component you created above. Your `about.html.mdx` should look similar to this:
-
-```markdown
-import Layout from '../layout.html.jsx'
-
-Everything between the import and export in the source is **just markdown** using [MDX](https://mdxjs.com/)!
-
-export default ({ children }) => <Layout>{children}</Layout>
-```
-
+<TerminalInput>
+  mkdir pages
+</TerminalInput>
 <Caption>
-  An example <InlineCode>about.html.mdx</InlineCode> file in a Charge project.
+  Creating a <InlineCode>/pages</InlineCode> directory.
 </Caption>
 
-Before deploying your project, import the about page you just created by modifying your `index.html.jsx` to look like this:
+Now you should create an `index.js` file inside your `/pages` directory with the following code:
 
 ```jsx
-import About from './pages/about.html.mdx'
+import fetch from 'isomorphic-unfetch'
+import Link from 'next/link'
 
-export default () => {
+HomePage.getInitialProps = async ({ req, query }) => {
+  const host = req ? `https://${req.headers.host}` : ''
+  const pageRequest = `${host}/api/profiles?page=${
+    query.page
+  }&limit=${query.limit || 9}`
+  const res = await fetch(pageRequest)
+  const json = await res.json()
+  return json
+}
+
+function HomePage({ profiles, page, pageCount }) {
   return (
     <>
-      <h1>Welcome to my new Charge site!</h1>
-      <About />
+      <ul>
+        {profiles.map(p => (
+          <li className="profile" key={p.id}>
+            <Link prefetch href={`/profile?id=${p.id}`}>
+              <a>
+                <img src={p.avatar} />
+                <span>{p.name}</span>
+              </a>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <nav>
+        {page > 1 && (
+          <Link prefetch href={`/?page=${page - 1}&limit=9`}>
+            <a>Previous</a>
+          </Link>
+        )}
+        {page < pageCount && (
+          <Link prefetch href={`/?page=${page + 1}&limit=9`}>
+            <a className="next">Next</a>
+          </Link>
+        )}
+      </nav>
     </>
   )
 }
+
+export default HomePage
 ```
 
 <Caption>
-  An example <InlineCode>index.html.jsx</InlineCode> file in a Charge project
-  that imports the About content component and uses it in the page.
+  An example <InlineCode>pages/index.js</InlineCode> file for your project.
 </Caption>
 
-Now that you have a simple Charge site created, you're ready to deploy with [Now](/docs/v2).
+<Note>
+  This is an extract, the full code for this file can be found in the{' '}
+  <GenericLink href="https://github.com/zeit/now-examples">
+    example repository.
+  </GenericLink>
+</Note>
 
-## Step 3: Deploy Your Charge Project with Now
+Your `pages/index.js` file performs the following functions:
 
-To deploy with Now, you will need to provide a small amount of instructions on how to build your Charge project using a [`now.json` configuration file](/docs/v2/deployments/configuration) at the root of your project directory.
+- Checks whether the request is being made from the server or client side
+- Makes a request to the API for profiles using query parameters
+- Returns the profile and pagination data
+- Lists the profiles in a gallery view
+- Uses the pagination data to display navigation buttons
 
-Create a [`now.json` file](/docs/v2/deployments/configuration) at the project root and add the following code:
+The next page you should create in the `/pages` directory is `.profile.js`, this will render a more detailed view of an individual profile:
+
+```jsx
+import fetch from 'isomorphic-unfetch'
+import Link from 'next/link'
+
+ProfilePage.getInitialProps = async ({ req, query }) => {
+  const host = req ? `https://${req.headers.host}` : ''
+  const res = await fetch(`${host}/api/profiles/${query.id}`)
+  const json = await res.json()
+  return json
+}
+
+function ProfilePage({ profile }) {
+  return (
+    <>
+      <div>
+        <img src={profile.avatar} />
+        <h1>{profile.name}</h1>
+        <p>{profile.address}</p>
+        <p>{profile.email}</p>
+        <Link prefetch href="/">
+          <a>← Back to profiles</a>
+        </Link>
+      </div>
+    </>
+  )
+}
+
+export default ProfilePage
+```
+
+<Caption>
+  An example <InlineCode>pages/profile.js</InlineCode> file for your project.
+</Caption>
+
+<Note>
+  This is an extract, the full code for this file can be found in the{' '}
+  <GenericLink href="https://github.com/zeit/now-examples">
+    example repository.
+  </GenericLink>
+</Note>
+
+Your `pages/index.js` file performs the following functions:
+
+- Checks whether the request is being made from the server or client side
+- Makes a request to the API for profiles using a query parameter
+- Returns the profile data and displays it with the option to go back
+
+You now have a complete application with both an API and interface, the next section will show you how to deploy it seamlessly to [Now](/docs/v2/getting-started/introduction-to-now).
+
+## Step 6: Deploy Your Project with Now
+
+Getting your project ready to [deploy](/docs/v2/deployments/basics/) with [Now](/docs/v2/getting-started/introduction-to-now) could hardly be simpler, first you should create `next.config.js` file in your root directory with the following code:
+
+```js
+module.exports = {
+  target: 'serverless'
+}
+```
+
+<Caption>
+  An example <InlineCode>next.config.js</InlineCode> file for your project.
+</Caption>
+
+The purpose of this file is to tell Next to build for a serverless environment, only 3 lines of code are needed!
+
+You should also create a `.nowignore` file, this works the same way a `.gitignore` file does, preventing unnecessary files and folders being uploaded to [Now](/docs/v2/getting-started/introduction-to-now) during [deployment](/docs/v2/deployments/basics/), making it even quicker:
+
+```markdown
+node_modules
+.gitignore
+```
+
+<Caption>
+  An example <InlineCode>.nowignore</InlineCode> file for your project.
+</Caption>
+
+The last file you should create is a [`now.json` file](/docs/v2/deployments/configuration), this will bring your project together with just a few lines of code before deployment, create one with the following code:
 
 ```json
 {
   "version": 2,
-  "name": "my-charge-project",
+  "name": "serverless-mysql",
+  "alias": "serverless-mysql.now.sh",
   "builds": [
+    { "src": "api/**/*.js", "use": "@now/node" },
+    { "src": "next.config.js", "use": "@now/next" }
+  ],
+  "routes": [
     {
-      "src": "package.json",
-      "use": "@now/static-build"
+      "src": "/api/profiles/(?<id>[^/]*)",
+      "dest": "api/profiles/profile.js?id=$id"
     }
-  ]
+  ],
+  "env": {
+    "MYSQL_HOST": "@mysql_host",
+    "MYSQL_USER": "@mysql_user",
+    "MYSQL_PASSWORD": "@mysql_password",
+    "MYSQL_DATABASE": "@mysql_database"
+  }
 }
 ```
 
 <Caption>
-  An example <InlineCode>now.json</InlineCode> file in a Charge project.
+  An example <InlineCode>now.json</InlineCode> file for your project.
 </Caption>
 
 The [`now.json` file](/docs/v2/deployments/configuration) allows you to achieve many things with your [deployment](/docs/v2/deployments/basics/), below is a description of what each property does:
 
 - [`version`](/docs/v2/deployments/configuration/#version) ensures you are using the latest [Now 2.0 platform](/docs/v2/platform/overview) version
 - [`name`](/docs/v2/deployments/configuration/#name) defines a project name your deployment will be known by under Now
-- [`builds`](/docs/v2/deployments/configuration/#builds) provides one build step using [`@now/static-build`](/docs/v2/deployments/official-builders/static-build-now-static-build/) to instruct Now to statically build the project and deploy the `dist` directory, using the `package.json` file as an entrypoint
+- [`alias`](/docs/v2/deployments/configuration/#alias) allows you to set an alias that can be [used in production](/docs/v2/domains-and-aliases/aliasing-a-deployment/)
+- [`builds`](/docs/v2/deployments/configuration/#builds) instructs Now to use the [`@now/node`](/docs/v2/deployments/official-builders/node-js-now-node/) and [`@now/next`](/docs/v2/deployments/official-builders/next-js-now-next/) [builders](/docs/v2/deployments/builders/overview/) for your applications API and interface respectively
+- [`routes`](/docs/v2/deployments/configuration/#routes) routes individual profile requests to the correct function, with the id parameter
+- [`env`](/docs/v2/deployments/configuration/#env) injects defined secrets into the app, exposing them as [environment variables](/docs/v2/deployments/environment-variables-and-secrets#from-now.json)
 
-  <Note>
-    By default, Now will cache static assets in every{' '}
-    <GenericLink href="/docs/v2/platform/regions-and-providers">
-      region
-    </GenericLink>
-    , making your site fast to load wherever you are in the world.
-  </Note>
-
-Lastly, add a `now-build` script to `package.json` which will be used by the [Builder](/docs/v2/deployments/builders/overview/), [`@now/static-build`](/docs/v2/deployments/official-builders/static-build-now-static-build/), to specify what command Now should run to build the site in the cloud:
-
-```json
-{
-  "scripts": {
-    ...
-    "now-build": "yarn build"
-  }
-}
-```
-
-<Caption>
-  Adding a <InlineCode>now-build</InlineCode> script to the{' '}
-  <InlineCode>package.json</InlineCode> file in a Charge project.
-</Caption>
-
-Additionally, to speed up the deployment process by not uploading un-necessary files, create a [`.nowignore` file](https://zeit.co/docs/v2/deployments/ignoring-source-paths) at the root of the project:
-
-There are three items, in this example, that you should add to the [`.nowignore` file](https://zeit.co/docs/v2/deployments/ignoring-source-paths); `/node_modules`, `/dist`, and`/tmp` - the directory Charge creates when serving content locally:
-
-```
-node_modules
-tmp
-dist
-```
-
-<Caption>
-  An example <InlineCode>.nowignore</InlineCode> file in a Charge project.
-</Caption>
+<br />
 
 Finally, deploy the application with [Now](/docs/v2/getting-started/introduction-to-now).
 
 If you have not yet installed Now, you can do so by installing the [Now Desktop app](/docs/v2/getting-started/installation/#now-desktop) which installs Now CLI automatically, or by [installing Now CLI](/docs/v2/getting-started/installation/#now-cli) directly.
 
-Now allows you to [deploy your project](/docs/v2/deployments/basics) from the terminal with just one command:
+[Now](/docs/v2/getting-started/introduction-to-now) allows you to [deploy your project](/docs/v2/deployments/basics) from the terminal with just one command:
 
 <TerminalInput>now</TerminalInput>
 <Caption>
   Deploying an application with Now using only one command.
 </Caption>
 
-You will see a short build step in your terminal followed by the news that your Charge project has now been [deployed](https://zeit.co/docs/v2/deployments/basics/), it should look similar to this: <https://charge-example.now.sh/>
-
-## Bonus: Omitting the `.html` Extension
-
-Your Charge site is now deployed, but wouldn't it be great if the URL didn't show the file extension at the end?
-
-Thankfully, Now provides an easy method to achieve this, simply add the following code to your `package.json` file:
-
-```json
-{
-  ...
-  "routes": [{ "src": "/(.*).html", "dest": "/$1" }]
-}
-```
-
-In this example, `routes` is used to rewrite paths, meaning that the `.html` extension will no longer be displayed.
+You will see a short build step in your terminal followed by the news that your project has now been [deployed](https://zeit.co/docs/v2/deployments/basics/), it should look similar to this: <https://serverless-mysql.now.sh/>
 
 ## Resources
 
-For more information on working with Charge, please refer to [their documentation](https://charge.js.org).
+For more information on working with [MySQL](https://www.mysql.com/) and [Next.js](https://nextjs.org/), please refer to their documentation.
 
-To configure Now further, please see these additional topics and guides:
+To configure [Now](/docs/v2/getting-started/introduction-to-now) further, please see these additional topics and guides:
 
 <Card title="Deploying Basics" href="/docs/v2/deployments/basics">
   Deploy any of your applications with ZEIT Now.
