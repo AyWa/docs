@@ -18,7 +18,7 @@ export const meta = {
   image:
     'https://og-image.now.sh/**Deploy%20Next.js%20%2B%20MySQL**%20with%20Now.png?theme=light&md=1&fontSize=75px&images=https%3A%2F%2Fassets.zeit.co%2Fimage%2Fupload%2Ffront%2Fassets%2Fdesign%2Fnextjs-black-logo.svg&images=https%3A%2F%2Fcdn.worldvectorlogo.com%2Flogos%2Fmysql.svg&widths=undefined&widths=350',
   editUrl: 'pages/guides/deploying-next-and-mysql-with-now.mdx',
-  lastEdited: '2019-04-25T12:28:30.000Z'
+  lastEdited: '2019-04-25T22:32:37.000Z'
 }
 
 [Next.js](https://nextjs.org/) is a framework, created by [ZEIT](https://zeit.co), for making production-ready, fast, and extended React applications with a lot of handy features built-in.
@@ -52,7 +52,7 @@ Once you have your remote MySQL database setup, you should make a note of your d
 - Database username
 - Database password
 
-Using these credentials, you should connect to your database and insert the [example data](https://github.com/zeit/now-examples/blob/add/next-mysql/nextjs-mysql/db.sql) into a new table. This guide does not cover inserting records into a MySQL database, more information on doing this can be found in the [MySQL documentation](https://dev.mysql.com/doc/mysql-getting-started/en/#mysql-getting-started-connecting).
+Using these credentials, you should connect to your database and insert the [example data](https://github.com/zeit/now-examples/blob/master/nextjs-mysql/db.sql) into a new table. This guide does not cover inserting records into a MySQL database, more information on doing this can be found in the [MySQL documentation](https://dev.mysql.com/doc/mysql-getting-started/en/#mysql-getting-started-connecting).
 
 ## Step 2: Set Up Your Project
 
@@ -268,10 +268,12 @@ import fetch from 'isomorphic-unfetch'
 import Link from 'next/link'
 
 HomePage.getInitialProps = async ({ req, query }) => {
-  const host = req ? `https://${req.headers.host}` : ''
-  const pageRequest = `${host}/api/profiles?page=${
-    query.page
-  }&limit=${query.limit || 9}`
+  const protocol = req
+    ? `${req.headers['x-forwarded-proto']}:`
+    : location.protocol
+  const host = req ? req.headers['x-forwarded-host'] : location.host
+  const pageRequest = `${protocol}//${host}/api/profiles?page=${query.page ||
+    1}&limit=${query.limit || 9}`
   const res = await fetch(pageRequest)
   const json = await res.json()
   return json
@@ -317,7 +319,7 @@ export default HomePage
 
 <Note>
   This is an extract, the full code for this file can be found in the{' '}
-  <GenericLink href="https://github.com/zeit/now-examples/blob/add/next-mysql/nextjs-mysql/pages/index.js">
+  <GenericLink href="https://github.com/zeit/now-examples/blob/master/nextjs-mysql/pages/index.js">
     example repository
   </GenericLink>
   .
@@ -338,8 +340,12 @@ import fetch from 'isomorphic-unfetch'
 import Link from 'next/link'
 
 ProfilePage.getInitialProps = async ({ req, query }) => {
-  const host = req ? `https://${req.headers.host}` : ''
-  const res = await fetch(`${host}/api/profiles/${query.id}`)
+  const protocol = req
+    ? `${req.headers['x-forwarded-proto']}:`
+    : location.protocol
+  const host = req ? req.headers['x-forwarded-host'] : location.host
+  const pageRequest = `${protocol}//${host}/api/profiles/${query.id}`
+  const res = await fetch(pageRequest)
   const json = await res.json()
   return json
 }
@@ -369,7 +375,7 @@ export default ProfilePage
 
 <Note>
   This is an extract, the full code for this file can be found in the{' '}
-  <GenericLink href="https://github.com/zeit/now-examples/blob/add/next-mysql/nextjs-mysql/pages/profile.js">
+  <GenericLink href="https://github.com/zeit/now-examples/blob/master/nextjs-mysql/pages/profile.js">
     example repository
   </GenericLink>
   .
