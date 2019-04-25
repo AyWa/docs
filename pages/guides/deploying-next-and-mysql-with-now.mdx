@@ -18,7 +18,7 @@ export const meta = {
   image:
     'https://og-image.now.sh/**Deploy%20Next.js%20%2B%20MySQL**%20with%20Now.png?theme=light&md=1&fontSize=75px&images=https%3A%2F%2Fassets.zeit.co%2Fimage%2Fupload%2Ffront%2Fassets%2Fdesign%2Fnextjs-black-logo.svg&images=https%3A%2F%2Fcdn.worldvectorlogo.com%2Flogos%2Fmysql.svg&widths=undefined&widths=350',
   editUrl: 'pages/guides/deploying-next-and-mysql-with-now.mdx',
-  lastEdited: '2019-04-25T22:32:37.000Z'
+  lastEdited: '2019-04-25T23:30:07.000Z'
 }
 
 [Next.js](https://nextjs.org/) is a framework, created by [ZEIT](https://zeit.co), for making production-ready, fast, and extended React applications with a lot of handy features built-in.
@@ -52,7 +52,7 @@ Once you have your remote MySQL database setup, you should make a note of your d
 - Database username
 - Database password
 
-Using these credentials, you should connect to your database and insert the [example data](https://github.com/zeit/now-examples/blob/master/nextjs-mysql/db.sql) into a new table. This guide does not cover inserting records into a MySQL database, more information on doing this can be found in the [MySQL documentation](https://dev.mysql.com/doc/mysql-getting-started/en/#mysql-getting-started-connecting).
+Using these credentials, you should connect to your database and insert the [example data](https://github.com/zeit/now-examples/blob/master/nextjs-mysql/db.sql) into a new table named `profiles`. This guide does not cover inserting records into a MySQL database, more information on doing this can be found in the [MySQL documentation](https://dev.mysql.com/doc/mysql-getting-started/en/#mysql-getting-started-connecting).
 
 ## Step 2: Set Up Your Project
 
@@ -70,7 +70,7 @@ Next, [initialize](https://yarnpkg.com/lang/en/docs/cli/init/) the project:
   Initializing the project, this creates a <InlineCode>package.json</InlineCode>{' '}file.
 </Caption>
 
-Yarn will present some initial questions to set up your project, complete this and when done, add [`next-mysql`](https://github.com/jeremydaly/serverless-mysql) as a [dependency](https://yarnpkg.com/en/docs/cli/add#toc-yarn-add):
+Yarn will present some initial questions to set up your project, complete this and when done, add [`serverless-mysql`](https://github.com/jeremydaly/serverless-mysql) and [`sql-template-strings`](https://github.com/felixfbecker/node-sql-template-strings) as [dependencies](https://yarnpkg.com/en/docs/cli/add#toc-yarn-add):
 
 <TerminalInput>yarn add serverless-mysql sql-template-strings</TerminalInput>
 <Caption>
@@ -87,9 +87,9 @@ Managing MySQL connections is an essential part of using it **successfully in a 
   <GenericLink href="https://en.wikipedia.org/wiki/SQL_injection">
     SQL Injection
   </GenericLink>{' '}
-  by using a{' '}
+  by using{' '}
   <GenericLink href="https://blogs.msdn.microsoft.com/sqlphp/2008/09/30/how-and-why-to-use-parameterized-queries/">
-    parameterized query
+    parameterized queries
   </GenericLink>
   .
 </Note>
