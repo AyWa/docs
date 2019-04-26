@@ -109,7 +109,7 @@ If a `Cargo.toml` exists in the project relating to the entry point, the depende
 
 #### `Cargo.toml` Entry Point
 
-When using a `Cargo.toml` file as an entry point for this Builder, Now will use `cargo read-manifest` to build each binary within the project.
+When using a `Cargo.toml` file as an entry point for this Builder, Now will use `cargo read-manifest` to build each binary within the project. It means that **[cargo workspaces](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html) are not supported as an entry point for now.** See [cargo workspace workaround](#cargo-workspaces-workaround)
 
 This entry point method is an advanced method of using this Builder and requires Rust files to assemble their own runtimes.
 
@@ -207,3 +207,31 @@ The goal of the ZEIT Docs is to provide you with all the information you need to
 </Card>
 
 export default ({ children }) => <Doc meta={meta}>{children}</Doc>
+
+## Cargo Workspaces Workaround
+
+Cargo Workspace is a very powerfull tools, and even required, by some IDE. However if a cargo workspace is present, `now-rust` might fail to build.
+For now, the solution is to add all your cargo workspace in `.gitignore` or `.nowignore`.
+Given the project:
+
+```
+.
+├── .nowignore <- will need to have `/Cargo.toml` and `/Cargo.lock` to be safe
+├── Cargo.lock <- cargo workspace 
+├── Cargo.toml <- cargo workspace
+├── now.json
+├── now_importer
+│   ├── Cargo.toml
+│   └── src
+│       └── lib.rs
+├── now_importer_binary
+│   ├── Cargo.toml
+│   └── src
+│       └── main.rs
+└── now_importer_lambda
+    ├── Cargo.lock
+    ├── Cargo.toml
+    └── src
+        └── main.rs
+```
+
