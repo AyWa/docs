@@ -14,7 +14,7 @@ export const meta = {
   authors: ['timothy'],
   url: '/guides/deploying-gatsby-with-now',
   editUrl: 'pages/guides/deploying-gatsby-with-now.mdx',
-  lastEdited: '2019-05-01T00:10:23.000Z'
+  lastEdited: '2019-06-19T22:44:34.000Z'
 }
 
 [Gatsby](https://www.gatsbyjs.org) is a popular front-end framework that helps you create static apps and websites with React.
@@ -76,6 +76,10 @@ First, you need to provide Now with instructions on how to build your Gatsby pro
 }
 ```
 
+<Caption>
+  An example <InlineCode>now.json</InlineCode> file for your Gatsby project.
+</Caption>
+
 This now.json file will allow your deployment to do several things, specifically:
 
 - Use the [latest Now 2.0 version](/docs/v2/platform/overview/#versioning) of the platform.
@@ -93,6 +97,11 @@ The @now/static-build Builder you added requires a script to be included in the 
   }
 }
 ```
+
+<Caption>
+  Adding a <InlineCode>now build</InlineCode> script to your{' '}
+  <InlineCode>now.json</InlineCode> file.
+</Caption>
 
 And with configuration set up, you can now deploy your Gatsby project.
 
