@@ -232,27 +232,10 @@ export default withAmp(({ children }) => <Doc meta={meta}>{children}</Doc>, {
 
 ## Cargo Workspaces Workaround
 
-Cargo Workspace is a very powerfull tools, when building multiple binaries and reusable library. However if a cargo workspace is present, `now-rust` might fail to build.
-For now, the solution is to add all your cargo workspace in `.gitignore` or `.nowignore`.
-Given the project:
+Cargo's workspaces feature is a great tool when working on multiple binaries and libraries in a single project. If a cargo workspace is found in the entrypoint, however, `@now/rust` will **fail to build**.
 
-```
-.
-├── .nowignore <- will need to have `/Cargo.toml` and `/Cargo.lock` to be safe
-├── Cargo.lock <- cargo workspace
-├── Cargo.toml <- cargo workspace
-├── now.json
-├── now_importer
-│   ├── Cargo.toml
-│   └── src
-│       └── lib.rs
-├── now_importer_binary
-│   ├── Cargo.toml
-│   └── src
-│       └── main.rs
-└── now_importer_lambda
-    ├── Cargo.lock
-    ├── Cargo.toml
-    └── src
-        └── main.rs
-```
+To get around this limitation, create build entries in your `now.json` file for each `Cargo.toml` that represents a lambda function within your workspace. In your `.nowignore`, you'll want to add any binary or library project folders that aren't needed for your lambdas to speed up the build process like your `Cargo.toml` workspace.
+
+It's also recommended to have a `Cargo.lock` alongside your lambda `Cargo.toml` files to speed up the build process. You can do this by running `cargo check` or a similar command within each project folder that contains a lambda.
+
+If you have a compelling case for workspaces to be supported by `@now/rust` which are too cumbersome with this workaround, please contact us! We're always looking for feedback.
